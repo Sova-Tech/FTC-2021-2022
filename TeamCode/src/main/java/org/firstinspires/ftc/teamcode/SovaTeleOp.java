@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -38,158 +37,217 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 
-@TeleOp(name="SovaTeleOP", group="Linear Opmode")
-//@Disabled
-public class SovaTeleOp extends LinearOpMode {
 
-    /*
-        right stick = forward;
-        left stick = right
-        cross = intake; (toggle)
-        left bumper = conveyour
-        right bumper = conveyour + shooter;
-        right arrow = shooter motor;
-      need to add all buttons;
+@TeleOp(name="SovaTechTeleOp", group="Linear Opmode")
+public class SovaTechTeleOp extends LinearOpMode {
+
+    // declaratii
+    private ElapsedTime runtime = new ElapsedTime();
+
+    private DcMotor topLeft = null;
+    private DcMotor topRight = null;
+    private DcMotor bottomRight = null;
+    private DcMotor bottomLeft = null;
+
+    private DcMotorEx macara = null;
+    private DcMotor carusel = null;
+    private DcMotor intake = null;
+    Servo gheara;
+
+    double powerTopLeft = 0;
+    double powerTopRight = 0;
+    double powerBottomRight = 0;
+    double powerBottomLeft = 0;
+
+
+    boolean deschis = false;
+
+    /**
+     * configurare hardware map:
+     *   W1     W2
+     *       *
+     *   W4     W3
      */
 
-    // Declare OpMode members.
-    private ElapsedTime runtime = new ElapsedTime();
-    private DcMotor driveMotorR = null;
-    private DcMotor driveMotorL = null;
-    private DcMotor intakeMotor = null;
-    private DcMotor conveyorMotor = null;
-    private DcMotorEx shooterMotor = null;
-    private DcMotor wobbleMotor = null;
-    Servo wobbleServo;
+    static final double     COUNTS_PER_MOTOR_REV    = 28;
+    static final double     GEAR_REDUCTION    = 80;
+    static final double     COUNTS_PER_GEAR_REV    = COUNTS_PER_MOTOR_REV * GEAR_REDUCTION;
+    static final double     COUNTS_PER_DEGREE    = COUNTS_PER_GEAR_REV/360;
 
-    private boolean isIntakeOn = false;
-    private double driveMotorSpeedBasic = 1;
-    private boolean isWobbleOff = true;
-    double powerDriveR;
-    double powerDriveL;
-    double intakePower;
+    private ElapsedTime runtime_carusel= new ElapsedTime();
+
 
     @Override
     public void runOpMode() {
+
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
-        //Declare Motors----------------------------------------------------------------------------
-        driveMotorR = hardwareMap.get(DcMotor.class, "driveMotorR");
-        driveMotorL = hardwareMap.get(DcMotor.class, "driveMotorL");
-        intakeMotor = hardwareMap.get(DcMotor.class, "intakeMotor");
-        conveyorMotor = hardwareMap.get(DcMotor.class, "conveyorMotor");
-        shooterMotor = hardwareMap.get(DcMotorEx.class, "shooterMotor");
-        wobbleMotor = hardwareMap.get(DcMotor.class, "wobbleMotor");
-        wobbleServo = hardwareMap.get(Servo.class, "wobbleServo");
+        double a;
 
-        //Declare Directions and encoders-----------------------------------------------------------
-        driveMotorR.setDirection(DcMotor.Direction.FORWARD);
-        driveMotorL.setDirection(DcMotor.Direction.REVERSE);
-        intakeMotor.setDirection(DcMotor.Direction.FORWARD);
-        conveyorMotor.setDirection(DcMotor.Direction.REVERSE);
-        shooterMotor.setDirection(DcMotor.Direction.REVERSE);
-        wobbleMotor.setDirection(DcMotor.Direction.FORWARD);
+        //instantierea motoarelor
+        topLeft = hardwareMap.get(DcMotor.class, "left_top");
+        topRight = hardwareMap.get(DcMotor.class, "right_top");
+        bottomRight = hardwareMap.get(DcMotor.class, "right_bottom");
+        bottomLeft = hardwareMap.get(DcMotor.class, "left_bottom");
 
-        shooterMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        macara = hardwareMap.get(DcMotorEx.class, "macara");
+        gheara = hardwareMap.get(Servo.class, "gheara");
+        carusel = hardwareMap.get(DcMotor.class, "carusel");
+        intake = hardwareMap.get(DcMotor.class, "intake");
 
-        //Wait for Start----------------------------------------------------------------------------
+        /// de verificat directiile
+        topLeft.setDirection(DcMotor.Direction.FORWARD);
+        topRight.setDirection(DcMotor.Direction.REVERSE);
+        bottomRight.setDirection(DcMotor.Direction.REVERSE);
+        bottomLeft.setDirection(DcMotor.Direction.FORWARD);
+
+
+
+        macara.setDirection(DcMotorEx.Direction.FORWARD);
+
+        macara.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
+        macara.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        macara.setZeroPowerBehavior(DcMotorEx.ZeroPowerBehavior.BRAKE);
+
+
+
+
         waitForStart();
         runtime.reset();
 
         while (opModeIsActive()) {
 
-            //Drive Train---------------------------------------------------------------------------
-            double drive = gamepad1.left_stick_y;
-            double turn  =  -gamepad1.right_stick_x;
-            powerDriveR    = Range.clip(drive + turn, -driveMotorSpeedBasic, driveMotorSpeedBasic) ;
-            powerDriveL   = Range.clip(drive - turn, -driveMotorSpeedBasic, driveMotorSpeedBasic) ;
 
-            driveMotorR.setPower(powerDriveR);
-            driveMotorL.setPower(powerDriveL);
+            int telemetrie = (int)macara.getCurrentPosition();
+            telemetry.addData( "macara ", telemetrie );
 
-            /*//Wobble Servo--------------------------------------------------------------------------
-            if(gamepad1.triangle){
-                if(isWobbleOff)
-                {
-                    wobbleServo.setPosition(0.3);
-                    isWobbleOff = false;
-                    sleep(500);
+
+            double vx = gamepad1.left_stick_x;
+            double vy = gamepad1.left_stick_y;
+            double r = -gamepad1.right_stick_x;
+
+
+            powerTopLeft = Range.clip((vy - vx + r)/2, -0.7, 0.7);
+            powerTopRight = Range.clip((vy + vx - r)/2, -0.7, 0.7);
+            powerBottomRight = Range.clip((vy - vx - r)/2, -0.7, 0.7);
+            powerBottomLeft = Range.clip((vy + vx + r)/2, -0.7, 0.7);
+
+            
+            /**
+             *  left_trigger si right_trigger sunt pentru slow/fast mode
+             */
+            if(gamepad1.left_trigger > 0)
+            {
+                powerTopLeft/=2;
+                powerTopRight/=2;
+                powerBottomLeft/=2;
+                powerBottomRight/=2;
+            }
+
+            if(gamepad1.right_trigger > 0)
+            {
+                powerTopLeft/=0.7;
+                powerTopRight/=0.7;
+                powerBottomLeft/=0.7;
+                powerBottomRight/=0.7;
+            }
+
+            
+            topLeft.setPower(powerTopLeft);
+            topRight.setPower(powerTopRight);
+            bottomRight.setPower(powerBottomRight);
+            bottomLeft.setPower(powerBottomLeft);
+
+
+            
+            if(gamepad1.right_bumper){
+                macara.setPower(-0.5);
+            }
+            else if (gamepad1.left_bumper){
+                macara.setPower(0.5);
+            }
+            else {
+                macara.setPower(0);
+            }
+
+
+
+            //carusel
+            runtime_carusel.reset();
+            if( gamepad1.y )
+            {
+                carusel.setPower(-1);
+            }
+            else
+            {
+                carusel.setPower(0);
+            }
+
+
+            
+            //gheara
+            if( gamepad1.b ) {
+
+                deschis = false;
+                gheara.setPosition( 0.3 );
+                a = gheara.getPosition();
+                telemetry.addData("pozitie servo ", a );
+
+            }
+
+            if( gamepad1.a ) {
+                
+                deschis = true;
+                gheara.setPosition( 0.8 );
+                a = gheara.getPosition();
+                telemetry.addData("pozitie servo ", a );
+                
+            }
+            
+            
+            if( gamepad1.right_stick_button ){
+                intake.setPower( -1 );
+            }
+            else {
+                if( gamepad1.left_stick_button ){
+                    intake.setPower( 1 );
                 }
                 else
-                {
-                    wobbleServo.setPosition(0.0);
-                    isWobbleOff = true;
-                    sleep(500);
-                }
+                    intake.setPower(0);
             }
 
-            //Wobble Motor--------------------------------------------------------------------------
-            if(gamepad1.dpad_up)
-                wobbleMotor.setPower(0.5);
-            else if(gamepad1.dpad_down)
-                wobbleMotor.setPower(-0.5);
-            else
-                wobbleMotor.setPower(0);
-*/
-            //Shooter motor------------------------------------------------------------------------
-            if(gamepad2.right_bumper)
-                shooterMotor.setVelocity(1820);
-            else
-                shooterMotor.setPower(0);
-
-            //Wobble
-            //Claw
-            if (gamepad1.right_bumper) {
-                if (isWobbleOff) {
-                    wobbleServo.setPosition(0.3);
-                    isWobbleOff = false;
-                    sleep(500);
-                } else {
-                    wobbleServo.setPosition(0.0);
-                    isWobbleOff = true;
-                    sleep(500);
-                }
-            }
-
-            //Arm
-            if (gamepad1.left_trigger > 0)
-                wobbleMotor.setPower(0.5);
-            else if (gamepad1.right_trigger > 0)
-                wobbleMotor.setPower(-0.5);
-            else
-                wobbleMotor.setPower(0);
-
-            //Conveyor Motor------------------------------------------------------------------------
-            if(gamepad2.left_bumper)
-                conveyorMotor.setPower(1.0);
-            else if(gamepad2.square)
-                conveyorMotor.setPower(-1);
-            else
-                conveyorMotor.setPower(0);
-
-            //Intake Motor--------------------------------------------------------------------------
-            if(gamepad2.cross) {
-                isIntakeOn = !isIntakeOn;
-                sleep(500);
-            }
-
-            if(isIntakeOn)
-                intakePower = 0.9;
-            else
-                intakePower = 0;
-
-            intakeMotor.setPower(intakePower);
-
-            if(gamepad2.circle)
-                intakeMotor.setPower(-1);
-            else
-                intakeMotor.setPower(intakePower);
-            //END Intake Motor----------------------------------------------------------------------
 
 
             telemetry.addData("Status", "Run Time: " + runtime.toString());
             telemetry.update();
+
+
         }
+
     }
+
+    public void move_macara( double angle_tar ){
+
+
+        double target_angle = angle_tar + angle_tar/10;
+        double initial_angle = (double) (macara.getCurrentPosition()) / COUNTS_PER_DEGREE;
+
+        int angle = (int)( target_angle - initial_angle );
+
+        int armPosition = (int) (COUNTS_PER_DEGREE * angle);
+        int macara_current = macara.getCurrentPosition();
+        
+        int target = macara_current + armPosition;
+        macara.setTargetPosition(target);
+        macara.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+
+        
+        while( opModeIsActive() && macara.isBusy() ){
+            macara.setPower(0.3);
+        }
+
+
+    }
+
 }
